@@ -1,0 +1,891 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <queue>
+#include <unordered_map>
+#include <limits>
+#include <utility>
+#include <cstdlib>
+#include <ctime>
+#include <conio.h>
+#include <algorithm>
+
+using namespace std;
+
+
+//Function to clear screen
+void clearConsole() {
+system("cls");
+}
+
+void pauseScreen(){
+    cout << "\nPress Enter to continue...";
+    cin.ignore();
+    cin.get();
+}
+
+//Node initialzation for Attack name and its type
+struct Node {
+    string attack;
+    string type;
+    Node* next;
+
+    Node(const string& attack, const string& type) : attack(attack), type(type), next(nullptr) {}
+};
+
+
+//Linked list used to store attacks for different pokemons
+class LinkedList {
+public:
+    Node* head;
+
+    LinkedList() : head(nullptr) {}
+
+    void addAttack(const string& attack, const string& type) {
+        Node* newNode = new Node(attack, type);
+        if (!head) {
+            head = newNode;
+        } else {
+            Node* temp = head;
+            while (temp->next) {
+                temp = temp->next;
+            }
+            temp->next = newNode;
+        }
+    }
+
+    void printAttacks() const {
+        Node* temp = head;
+        while (temp) {
+            cout << temp->attack<< "(" << temp->type << ")";
+            if (temp->next) cout << ", ";
+            temp = temp->next;
+        }
+    }
+};
+
+
+//Pokemon class
+class Pokemon {
+public:
+    string name;
+    string type;
+    int health;
+    int experience;
+    int level;
+    int speed;
+
+     Pokemon(const string& name, const string& type, int tier, int speed)
+        : name(name), type(type), health(100 * tier), experience(0), level(tier), speed(speed) {}
+    
+    //Function to check if a pokemon is alive durin a battle
+    bool isAlive() const {
+        return health > 0;
+    }
+
+    //Function to manage health loss during battle
+    void takeDamage(int damage) {
+        health -= damage;
+        if (health < 0) {
+            health = 0;
+        }
+    }
+
+    //Function to manage health gained
+    void getHealed(int heal) {
+        health += heal;
+    }
+
+    //Function to manage experience gained
+    void gainXP(int xp) {
+        experience += xp;
+    }
+
+    //Attack function managing different types of attacks and their dmage
+    void attack(Pokemon& target, bool isElemental) {
+    int damage;
+    if (isElemental) {
+        damage = (rand() % 10 + 5 * level);
+        if (type == target.type) {
+            damage /= 4;
+        } else {
+            damage = static_cast<int>(damage * 1.5);
+        }
+    } else {
+        damage = (rand() % 10 + 5 * level);
+    }
+    
+    target.takeDamage(damage);
+    cout << name << " dealt " << damage << " damage to " << target.name << "!\n";
+    gainXP(30);
+}
+
+    //Function to determine amount of health gained after healing
+void heal() {
+    int healAmount = rand() % 10 + 5 * level;
+    getHealed(healAmount);
+    cout << name << " healed for " << healAmount << " health!\n";
+    }
+};
+
+//Function to determine if there is enough experience to levle up
+void levelUp(Pokemon& p) {
+    if (p.experience >= 100) {
+        p.level++;
+        cout << p.name << " leveled up to level " << p.level << "!\n";
+        p.experience -= 100;
+    }
+}
+
+//Manual implementation of Listed Maps, using Object Pokemon as key
+class CustomMap {
+private:
+    struct MapNode {
+        Pokemon key;
+        LinkedList attacks;
+        MapNode* next;
+
+        MapNode(const Pokemon& key) : key(key), next(nullptr) {}
+    };
+
+    MapNode* head;
+
+public:
+    CustomMap() : head(nullptr) {}
+
+    //insertion of a pokemon object with its list of attacks(for pokedex)
+    void insert(const Pokemon& key, LinkedList& attackList) {
+        MapNode* newNode = new MapNode(key);
+        newNode->attacks = attackList;
+
+        if (!head) {
+            head = newNode;
+        } else {
+            MapNode* temp = head;
+            while (temp->next) {
+                temp = temp->next;
+            }
+            temp->next = newNode;
+        }
+    }
+
+    //to access the attacks stored with a specific pokemon
+    LinkedList* getAttacks(const Pokemon& key) {
+        MapNode* temp = head;
+        while (temp) {
+            if (temp->key.name == key.name) {
+                return &temp->attacks;
+            }
+            temp = temp->next;
+        }
+        return nullptr;
+    }
+
+    //to retrieve a pokemon at a specific index
+    Pokemon getPokemonAtIndex(int index) const {
+    MapNode* temp = head;
+    int count = 0;
+    while (temp) {
+        if (count == index) {
+            return temp->key;
+        }
+        count++;
+        temp = temp->next;
+    }
+    throw runtime_error("Index out of bounds");
+}
+
+    //printing the pokemon name and thier attack(for testing purposes)
+    void print() const {
+        MapNode* temp = head;
+        while (temp) {
+            cout << temp->key.name << " - ";
+            temp->attacks.printAttacks();
+            cout << endl;
+            temp = temp->next;
+        }
+    }
+
+    //Number of pokemons currently stored(for the pokedex)
+    int size() const {
+        int count = 0;
+        MapNode* temp = head;
+        while (temp) {
+                count++;
+                temp = temp->next;
+            }
+        return count;
+    }
+};
+
+struct Position {
+    //coordinates for the maps
+    int x, y;
+};
+
+//dungeons
+class Dungeon {
+private:
+    struct MonsterNode {
+        Pokemon monster;
+        MonsterNode* next;
+
+        MonsterNode(const Pokemon& monster) : monster(monster), next(nullptr) {}
+    };
+
+    MonsterNode* front;
+    MonsterNode* rear;
+
+public:
+    Dungeon() : front(nullptr), rear(nullptr) {}
+
+    void enqueue(const Pokemon& monster) {
+        MonsterNode* newNode = new MonsterNode(monster);
+        if (!rear) {
+            front = rear = newNode;
+        } else {
+            rear->next = newNode;
+            rear = newNode;
+        }
+    }
+
+    Pokemon dequeue() {
+        if (!front) throw runtime_error("Queue is empty");
+        MonsterNode* temp = front;
+        Pokemon monster = front->monster;
+        front = front->next;
+        if (!front) rear = nullptr;
+        delete temp;
+        return monster;
+    }
+
+    bool isEmpty() const {
+        return front == nullptr;
+    }
+};
+
+//priority queue used to control first attack via speed of pokemon
+class PriorityQueue {
+private:
+    struct Node {
+        Pokemon pokemon;
+        Node* next;
+
+        Node(const Pokemon& p) : pokemon(p), next(nullptr) {}
+    };
+
+    Node* head;
+
+public:
+    PriorityQueue() : head(nullptr) {}
+
+    void push(const Pokemon& p) {
+        Node* newNode = new Node(p);
+        if (!head || head->pokemon.speed < p.speed) {
+            newNode->next = head;
+            head = newNode;
+        } else {
+            Node* current = head;
+            while (current->next && current->next->pokemon.speed >= p.speed) {
+                current = current->next;
+            }
+            newNode->next = current->next;
+            current->next = newNode;
+        }
+    }
+
+    Pokemon pop() {
+        if (!head) throw runtime_error("Priority queue is empty");
+        Node* temp = head;
+        Pokemon highestSpeedPokemon = head->pokemon;
+        head = head->next;
+        delete temp;
+        return highestSpeedPokemon;
+    }
+
+    bool isEmpty() const {
+        return head == nullptr;
+    }
+};
+
+struct PrevState {
+    int playerHealth;
+    int enemyHealth;
+
+    PrevState(int pHealth, int eHealth) : playerHealth(pHealth), enemyHealth(eHealth) {}
+};
+
+class UndoStack {
+private:
+    struct Node {
+        PrevState state;
+        Node* next;
+
+        Node(const PrevState& state) : state(state), next(nullptr) {}
+    };
+
+    Node* topNode;
+
+public:
+    UndoStack() : topNode(nullptr) {}
+
+    void push(const PrevState& state) {
+        Node* newNode = new Node(state);
+        newNode->next = topNode;
+        topNode = newNode;
+    }
+
+    PrevState pop() {
+        if (isEmpty()) throw runtime_error("Stack is empty");
+        Node* temp = topNode;
+        PrevState state = topNode->state;
+        topNode = topNode->next;
+        delete temp;
+        return state;
+    }
+
+    bool isEmpty() const {
+        return topNode == nullptr;
+    }
+};
+
+
+
+
+// Coordinate node used for d algo
+struct DijkstraNode {
+    Position coord;
+    int cost;
+
+    bool operator>(const DijkstraNode& other) const {
+        return cost > other.cost;
+    }
+};
+
+// checking function to see if a position is valid i.e place is empty of enemy pokemons/dungeons etc
+bool isDijkstraValid(int x, int y, const vector<vector<string>>& gameMap) {
+    return (x >= 0 && x < gameMap.size() && y >= 0 && y < gameMap[0].size() && gameMap[x][y].empty());
+}
+
+// Dijkstra's algorithm (my heads hurting)
+vector<Position> dijkstra(const Position& start, const Position& target, const vector<vector<string>>& gameMap) {
+    priority_queue<DijkstraNode, vector<DijkstraNode>, greater<DijkstraNode>> pq;
+    unordered_map<string, Position> previousCoordinates;
+    vector<vector<int>> distanceMap(gameMap.size(), vector<int>(gameMap[0].size(), numeric_limits<int>::max()));
+    
+    pq.push({start, 0});
+    distanceMap[start.x][start.y] = 0;
+
+    vector<Position> directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+
+    while (!pq.empty()) {
+        DijkstraNode currentNode = pq.top();
+        pq.pop();
+
+        if (currentNode.coord.x == target.x && currentNode.coord.y == target.y) {
+            vector<Position> path;
+            Position step = target;
+
+            while (step.x != start.x || step.y != start.y) {
+                path.push_back(step);
+                string key = to_string(step.x) + "," + to_string(step.y);
+                step = previousCoordinates[key];
+            }
+            path.push_back(start);
+            reverse(path.begin(), path.end());
+            return path;
+        }
+
+        for (const auto& dir : directions) {
+            int newX = currentNode.coord.x + dir.x;
+            int newY = currentNode.coord.y + dir.y;
+
+            if (isDijkstraValid(newX, newY, gameMap)) {
+                int newCost = currentNode.cost + 1;
+                if (newCost < distanceMap[newX][newY]) {
+                    distanceMap[newX][newY] = newCost;
+                    pq.push({{newX, newY}, newCost});
+                    previousCoordinates[to_string(newX) + "," + to_string(newY)] = currentNode.coord;
+                }
+            }
+        }
+    }
+
+    return {};
+}
+
+
+//RPG game Class
+class RPGGame {
+public:
+    //Pokedex which is used to store some pokemons
+    CustomMap pokedex;
+    //A vector of Pokemons storing which pokemons the player has collected so far
+    vector<Pokemon> playerCollection;
+    //Current positon of player
+    Position playerPos;
+    //2d array used for maps, of type string(Note, attempt sfml)
+    vector<vector<string>> map;
+    //lenght of the square map 
+    int mapSize;
+
+    
+
+    // Initializing the Map environment
+    void initializeMap() {
+    mapSize = 20;
+    map = vector<vector<string>>(mapSize, vector<string>(mapSize, ""));
+    
+    const string items[] = {"Pokemon", "Dungeon", "Power-Up"};
+    const int numItems = sizeof(items) / sizeof(items[0]);
+    const int numberOfItemsToPlace = 10; //no of stuff on map, change in accordance
+
+    srand(static_cast<unsigned>(time(0)));
+
+    // Randomly placing stuff on the map
+    for (int i = 0; i < numberOfItemsToPlace; ++i) {
+        int x, y;
+        bool placed = false;
+
+        while (!placed) {
+            x = rand() % mapSize;
+            y = rand() % mapSize;
+
+            if (map[x][y] == "") {
+                int itemIndex = rand() % numItems;
+                map[x][y] = items[itemIndex];
+                placed = true;
+            }
+        }
+    }
+}
+
+    string getCellContent(int x, int y) {
+        return map[x][y];
+    }
+
+    void clearCell(int x, int y) {
+        map[x][y] = "";
+    }
+
+//restoration of health post battles
+void restoreHealthAfterBattle(Pokemon& p) {
+    p.health = 100 * p.level; 
+    cout << p.name << " has restored health to " << p.health << "!\n";
+}
+
+
+//Adding pokemon to player collection
+void addPokemonToCollection(const string& name, const string& type, int tier, int speed) {
+    playerCollection.push_back(Pokemon(name, type, tier, speed));
+    cout << name << " has been added to your collection!\n";
+}
+
+//function to fast travel using dijkstras algorithm
+void fastTravel(const Position& target) {
+    Position start = playerPos;
+    vector<Position> path = dijkstra(start, target, map);
+
+    if (!path.empty()) {
+        playerPos = target;
+        displayMap();
+        cout << "Fast traveled to (" << target.x << ", " << target.y << ")!\n";
+    } else {
+        cout << "No valid path to (" << target.x << ", " << target.y << ")!\n";
+    }
+}
+
+
+//Function to manage the rpg battle
+void battle(Pokemon& playerPokemon, Pokemon& enemy) {
+    cout << "Battle Start!\n";
+    LinkedList* playerAttacks = pokedex.getAttacks(playerPokemon);
+
+    PriorityQueue turnOrder;
+    turnOrder.push(playerPokemon);
+    turnOrder.push(enemy);
+
+    UndoStack undoStack;
+
+    Pokemon firstAttacker = turnOrder.pop();
+    Pokemon secondAttacker = turnOrder.pop();
+
+    cout << firstAttacker.name << " ambushes " << secondAttacker.name << "!\n";
+
+    for (int i = 0; i < 2; ++i) {
+        if (firstAttacker.name == playerPokemon.name) {
+            int actionChoice;
+            do {
+                cout << "Choose your action:\n";
+                cout << "1. " << playerAttacks->head->attack << " (Physical Attack)\n";
+                cout << "2. " << playerAttacks->head->next->attack << " (Elemental Attack)\n";
+                cout << "3. Heal\n";
+                cout << "Enter your choice: ";
+                cin >> actionChoice;
+            } while (actionChoice < 1 || actionChoice > 3);
+
+            if (actionChoice == 1) {
+                playerPokemon.attack(secondAttacker, false);
+            } else if (actionChoice == 2) {
+                playerPokemon.attack(secondAttacker, true);
+            } else if (actionChoice == 3) {
+                playerPokemon.heal();
+            }
+        } else {
+            int enemyAction = rand() % 3 + 1;
+            if (enemyAction == 1) {
+                enemy.attack(playerPokemon, false);
+                cout << enemy.name << " used a physical attack!\n";
+            } else if (enemyAction == 2) {
+                enemy.attack(playerPokemon, true);
+                cout << enemy.name << " used an elemental attack!\n";
+            } else if (enemyAction == 3) {
+                enemy.heal();
+                cout << enemy.name << " healed itself!\n";
+            }
+        }
+    }
+
+    cout << playerPokemon.name << " (Health: " << playerPokemon.health << ") vs " 
+         << enemy.name << " (Health: " << enemy.health << ")\n";
+
+    while (playerPokemon.isAlive() && enemy.isAlive()) {
+        undoStack.push(PrevState(playerPokemon.health, enemy.health));
+
+        int actionChoice;
+        do {
+            cout << "Choose your action:\n";
+            cout << "1. " << playerAttacks->head->attack << " (Physical Attack)\n";
+            cout << "2. " << playerAttacks->head->next->attack << " (Elemental Attack)\n";
+            cout << "3. Heal\n";
+            cout << "4. Undo Last Action\n";
+            cout << "Enter your choice: ";
+            cin >> actionChoice;
+        } while (actionChoice < 1 || actionChoice > 4);
+
+        if (actionChoice == 1) {
+            playerPokemon.attack(enemy, false);
+        } else if (actionChoice == 2) {
+            playerPokemon.attack(enemy, true);
+        } else if (actionChoice == 3) {
+            playerPokemon.heal();
+        } else if (actionChoice == 4) {
+            undoStack.pop();
+            if (!undoStack.isEmpty()) {
+                PrevState prevState = undoStack.pop();
+                playerPokemon.health = prevState.playerHealth;
+                enemy.health = prevState.enemyHealth;
+                cout << "Last action undone!\n";
+                cout << playerPokemon.name << " Health: " << playerPokemon.health << ", " 
+                     << enemy.name << " Health: " << enemy.health << endl;
+            } else {
+                cout << "No actions to undo!\n";
+            }
+            continue;
+        }
+
+        // Enemy's turn (random action)
+        int enemyAction = rand() % 3 + 1;
+        if (enemyAction == 1) {
+            enemy.attack(playerPokemon, false);
+            cout << enemy.name << " used a physical attack!\n";
+        } else if (enemyAction == 2) {
+            enemy.attack(playerPokemon, true);
+            cout << enemy.name << " used an elemental attack!\n";
+        } else if (enemyAction == 3) {
+            enemy.heal();
+            cout << enemy.name << " healed itself!\n";
+        }
+
+        if (playerPokemon.isAlive()) {
+            levelUp(playerPokemon);
+        }
+        if (enemy.isAlive()) {
+            levelUp(enemy);
+        }
+
+        cout << playerPokemon.name << " Health: " << playerPokemon.health << "," << enemy.name << " Health: " << enemy.health << endl;
+    }
+
+    if (playerPokemon.isAlive()) {
+        cout << playerPokemon.name << " wins!\n";
+        addPokemonToCollection(enemy.name, enemy.type, enemy.level, enemy.speed);
+        clearCell(playerPos.x, playerPos.y);
+        //restoreHealthAfterBattle(playerPokemon);
+    } else {
+        cout << enemy.name << " wins!\n";
+        //restoreHealthAfterBattle(playerPokemon);
+    }
+    
+}
+
+//Function of encountering the battle
+void handleBattle() {
+    int enemyIndex = rand() % pokedex.size();
+    Pokemon enemy = pokedex.getPokemonAtIndex(enemyIndex);
+
+    cout << "A wild " << enemy.name << " appeared!\n";
+
+    cout << "Choose your Pokémon:\n";
+    for (size_t i = 0; i < playerCollection.size(); ++i) {
+        cout << (i + 1) << ". " << playerCollection[i].name << " (Health: " << playerCollection[i].health << ")\n";
+    }
+
+    int choice;
+    do {
+        cout << "Enter the number of the Pokemon you want to use: ";
+        cin >> choice;
+    } while (choice < 1 || choice > playerCollection.size());
+
+    Pokemon& selectedPokemon = playerCollection[choice - 1];
+
+    battle(selectedPokemon, enemy);
+}
+
+
+
+
+// battle mechanism for the pokemons inside dungeon
+void handleBattleWithMonsterDungeon(Pokemon& monster) {
+    cout << "A wild " << monster.name << " appeared!\n";
+    cout << "Choose your Pokémon:\n";
+    
+    // Display the player's Pokémon collection
+    for (size_t i = 0; i < playerCollection.size(); ++i) {
+        cout << (i + 1) << ". " << playerCollection[i].name << " (Health: " << playerCollection[i].health << ")\n";
+    }
+
+    int choice;
+    do {
+        cout << "Enter the number of the Pokémon you want to use: ";
+        cin >> choice;
+    } while (choice < 1 || choice > playerCollection.size());
+
+    Pokemon& selectedPokemon = playerCollection[choice - 1];
+
+    if (selectedPokemon.isAlive()) {
+        battle(selectedPokemon, monster);
+    } else {
+        cout << "Your selected Pokémon is fainted. Please choose another one.\n";
+        handleBattleWithMonsterDungeon(monster);
+    }
+}
+
+//Displaying the map real time
+void displayMap() {
+    clearConsole();
+    for (int i = 0; i < mapSize; ++i) {
+        for (int j = 0; j < mapSize; ++j) {
+            if (i == playerPos.x && j == playerPos.y) {
+                cout << "P "; // player: P
+            } else if (map[i][j].empty()) {
+                cout << ". "; // Empty cell
+            } else if (map[i][j] == "Pokemon") {
+                cout << "M "; // Pokemon: M
+            } else if (map[i][j] == "Dungeon") {
+                cout << "D "; // Dungeons: D
+            } else if (map[i][j] == "Power-Up") {
+                cout << "U "; // PowerUps: U
+            }
+        }
+        cout << endl;
+    }
+    cout << endl;
+}
+
+    RPGGame() : playerPos({0, 0}) {
+        initializeMap();
+        
+// Pikachu 
+LinkedList pikachuAttacks;
+pikachuAttacks.addAttack("Tail lash", "Physical");
+pikachuAttacks.addAttack("Electrocute", "Electric");
+Pokemon pikachu("Pikachu", "Electric", 3, 100);
+pokedex.insert(pikachu, pikachuAttacks);
+playerCollection.push_back(pikachu);
+
+// Charizard 
+LinkedList charizardAttacks;
+charizardAttacks.addAttack("Flamethrower", "Fire");
+charizardAttacks.addAttack("Dragon Claw", "Physical");
+Pokemon charizard("Charizard", "Fire", 10, 8);
+pokedex.insert(charizard, charizardAttacks);
+
+// Bulbasaur 
+LinkedList bulbasaurAttacks;
+bulbasaurAttacks.addAttack("Vine Whip", "Earth");
+bulbasaurAttacks.addAttack("Razor Leaf", "Physical");
+Pokemon bulbasaur("Bulbasaur", "Earth", 2, 5); 
+pokedex.insert(bulbasaur, bulbasaurAttacks);
+
+// Squirtle 
+LinkedList squirtleAttacks;
+squirtleAttacks.addAttack("Water Gun", "Water");
+squirtleAttacks.addAttack("Bubble", "Water");
+Pokemon squirtle("Squirtle", "Water", 1, 4);
+pokedex.insert(squirtle, squirtleAttacks);
+playerCollection.push_back(squirtle);
+
+// Jigglypuff 
+LinkedList jigglypuffAttacks;
+jigglypuffAttacks.addAttack("Pound", "Physical");
+jigglypuffAttacks.addAttack("Rollout", "Earth");
+Pokemon jigglypuff("Jigglypuff", "Magic", 6, 6);
+pokedex.insert(jigglypuff, jigglypuffAttacks);
+
+// Joltik
+LinkedList joltikAttacks;
+joltikAttacks.addAttack("Electro Ball", "Electric");
+joltikAttacks.addAttack("Bug Bite", "Bug");
+Pokemon joltik("Joltik", "Bug", 4, 6);
+pokedex.insert(joltik, joltikAttacks);
+
+// Vaporeon
+LinkedList vaporeonAttacks;
+vaporeonAttacks.addAttack("Water Pulse", "Water");
+vaporeonAttacks.addAttack("Aqua Ring", "Water");
+Pokemon vaporeon("Vaporeon", "Water", 10, 8);
+pokedex.insert(vaporeon, vaporeonAttacks);
+
+// Gardevoir
+LinkedList gardevoirAttacks;
+gardevoirAttacks.addAttack("Psychic", "Psychic");
+gardevoirAttacks.addAttack("Moonblast", "Fairy");
+Pokemon gardevoir("Gardevoir", "Psychic", 11, 7);
+pokedex.insert(gardevoir, gardevoirAttacks);
+
+// Gyarados
+LinkedList gyaradosAttacks;
+gyaradosAttacks.addAttack("Hydro Pump", "Water");
+gyaradosAttacks.addAttack("Dragon Rage", "Dragon");
+Pokemon gyarados("Gyarados", "Water", 15, 10);
+pokedex.insert(gyarados, gyaradosAttacks);
+    }
+
+
+//dungeon battle mechanism
+void startDungeon() {
+    Dungeon dungeon;
+
+    int numberOfMonsters = 3; 
+    for (int i = 0; i < numberOfMonsters; ++i) {
+        int randomIndex = rand() % pokedex.size();
+        Pokemon monster = pokedex.getPokemonAtIndex(randomIndex);
+        dungeon.enqueue(monster);
+    }
+
+    cout << "Dungeon Battle Start!\n";
+
+    while (!dungeon.isEmpty()) {
+        Pokemon monster = dungeon.dequeue();
+        cout << "A wild " << monster.name << " appeared!\n";
+        handleBattleWithMonsterDungeon(monster);
+    }
+
+    addPokemonToCollection("Charizard", "Fire", 10, 8);
+    cout << "You have been rewarded with a high-tier Pokémon!\n";
+}
+
+//function of playing the game
+void play() {
+        string command;
+        while (true) {
+            displayMap();
+            cout << "Your position: (" << playerPos.x << ", " << playerPos.y << ")\n";
+            cout << "Enter move (W/A/S/D to move, C to view collection, T to fast travel, Q to quit): ";
+            
+        if (_kbhit()) {
+            char command = _getch(); // Get the pressed key
+
+            if (command == 'Q' || command == 'q') {
+                cout << "Game over! Thanks for playing!\n";
+                break;
+            } else if (command == 'C' || command == 'c') {
+                cout << "Your collection:\n";
+                for (const Pokemon& p : playerCollection) {
+                    cout << p.name << " (Level: " << p.level << ")\n";
+                    pauseScreen();
+                }
+            } else {
+                movePlayer(command);
+            }
+        }
+    }
+}
+
+//function dealing with moving around the player
+void movePlayer(const char& command) {
+    int newX = playerPos.x;
+    int newY = playerPos.y;
+
+    if (command == 'W' || command == 'w') newX--;
+    else if (command == 'A' || command == 'a') newY--;
+    else if (command == 'S' || command == 's') newX++;
+    else if (command == 'D' || command == 'd') newY++;
+    else if (command == 'T' || command == 't') { // Fast travel command
+        Position target;
+        cout << "Enter target coordinates (x y): ";
+        cin >> target.x >> target.y; // Get target coordinates
+        clearConsole();
+        fastTravel(target); // Call fastTravel function
+
+        pauseScreen();
+
+        return; // Exit the function after fast travel
+    }
+
+    if (newX >= 0 && newX < mapSize && newY >= 0 && newY < mapSize) {
+        playerPos.x = newX;
+        playerPos.y = newY;
+
+        string cellContent = getCellContent(newX, newY);
+        if (cellContent == "Power-Up") {
+            cout << "You found a Power-Up! Pikachu's attacks are now stronger!\n";
+            clearCell(newX, newY);
+            pauseScreen();
+        } else if (cellContent == "Dungeon") {
+            cout << "You found a dungeon! Do you want to enter? (Y/N): ";
+            char choice;
+            cin >> choice;
+            if (choice == 'Y' || choice == 'y') {
+                startDungeon();
+            } else {
+                cout << "You chose not to enter the dungeon.\n";
+                pauseScreen();
+            }
+        }else if (!cellContent.empty()) {
+            cout << "You found a wild " << cellContent << "!\n";
+            handleBattle();
+        }  else {
+            cout << "Nothing here. Keep exploring!\n";
+
+        }
+    } else {
+        cout << "You can't move there!\n";
+    }
+}
+};
+
+
+//Main function
+int main() {
+    srand(static_cast<unsigned>(time(0)));
+
+    
+
+    RPGGame game;
+    game.play();
+
+
+
+    //testing code stuff
+    //game.handleBattle();
+    //cout<<"No runtime issue mate"<<endl;
+    //game.pokedex.print();
+    //game.playerCollection.print();
+    //game.initializeMap();
+    //game.displayMap();
+    
+    
+    return 0;
+}
